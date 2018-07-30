@@ -146,6 +146,12 @@ class Connect4GUIStartup(object):
             top.geometry("250x215")
             top.resizable(False, False)
             top.title("Connect4 Error!")
+            while True:
+                try:
+                    top.grab_set()
+                    break
+                except:
+                    top.after(100)
             message = tk.Message(master=top, text="Fix the following:\n"+error, font=("Helvetica", 14),
                                  background=error_color)
             message.pack()
