@@ -83,7 +83,12 @@ class Connect4GUI(object):
         self.game_over_bool = True
         top = tk.Toplevel(master=self.root, background=DEFAULT_WIDGET_BG)
         top.protocol("WM_DELETE_WINDOW", self.root.destroy)
-        top.grab_set()
+        while True:
+            try:
+                top.grab_set()
+                break
+            except:
+                top.after(100)
         top.geometry("250x215")
         top.resizable(False, False)
         if self.gamestate.winner == self.gamestate.p1k:
