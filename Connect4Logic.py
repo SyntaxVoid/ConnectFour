@@ -1,5 +1,6 @@
 import numpy as np
 import random
+from copy import deepcopy
 import time
 
 
@@ -12,7 +13,8 @@ class Connect4InvalidMove(Exception):
 
 
 class Connect4Logic(object):
-    def __init__(self, nrows, ncols, connectn, player1, player2, cpu1, cpu2):
+    def __init__(self, nrows, ncols, connectn, player1, player2, cpu1, cpu2,
+                 emptyk=None, p1k=None, p2k=None, board=None, current_turn=None, winner=None):
         self.nrows = nrows
         self.ncols = ncols
         self.connectn = connectn
@@ -20,12 +22,31 @@ class Connect4Logic(object):
         self.player2 = player2
         self.cpu1 = cpu1
         self.cpu2 = cpu2
-        self.emptyk = np.int8(0)
-        self.p1k = np.int8(1)
-        self.p2k = np.int8(2)
-        self.board = self.new_board(self.nrows, self.ncols)
-        self.current_turn = 1  # 1 -> Player 1's turn. 2 -> Player 2's turn.
-        self.winner = self.emptyk
+        if emptyk is None:
+            self.emptyk = np.int8(0)
+        else:
+            self.emptyk = emptyk
+        if p1k is None:
+            self.p1k = np.int8(1)
+        else:
+            self.p1k = p1k
+        if p2k is None:
+            self.p2k = np.int8(2)
+        else:
+            self.p2k = p2k
+        if board is None:
+            self.board = self.new_board(self.nrows, self.ncols)
+        else:
+            self.board = board
+            self.board = self.copy_board()
+        if current_turn is None:
+            self.current_turn = 1  # 1 -> Player 1's turn. 2 -> Player 2's turn.
+        else:
+            self.current_turn = current_turn
+        if winner is None:
+            self.winner = self.emptyk
+        else:
+            self.winner = winner
         self.check_computer_move()
         return
 
@@ -43,15 +64,39 @@ class Connect4Logic(object):
     def is_cpu_move(self):
         return (self.cpu1 and self.current_turn == 1) or (self.cpu2 and self.current_turn == 2)
 
+    def valid_columns(self):
+        valid_col_inds =  np.array([self.valid_move(col) for col in range(self.ncols)])
+        return np.array(range(self.ncols))[valid_col_inds]
+
     def computer_move(self):
-        return random.choice(list(range(self.ncols)))
+        # Priorities are:
+        #   1. to stop the opponent from winning.
+        #   2. to connect as many pieces as he can
+        #1.
+        valid_moves = self.valid_columns()
+        pseudo_object =  deepcopy(self.__dict__)
+        pseudo_object["cpu1"] = False
+        pseudo_object["cpu2"] = False
+        for mv in valid_moves:
+            new_state = Connect4Logic(**pseudo_object)
+            # Toggle the turn to see if the opponent can win by putting a piece anywhere
+            new_state.current_turn = 2 if new_state.current_turn == 1 else 1
+            new_state.drop_piece(mv)
+            if new_state.winner != new_state.emptyk:
+                return mv
+        for mv in valid_moves:
+            new_state = Connect4Logic(**pseudo_object)
+            new_state.drop_piece(mv)
+            if new_state.winner != new_state.emptyk:
+                return mv
+        return random.choice(valid_moves)
 
     def valid_move(self, col):
         if col > self.ncols:
             raise Connect4InvalidMove("col is greater than the number of columns ({} > {})".format(col, self.ncols))
         return np.any(self.board[:, col] == self.emptyk)
 
-    def drop_piece(self, col):
+    def drop_piece(self, col, docheck=False):
         if self.winner != self.emptyk:
             raise Connect4GameOver("Cannot drop piece! Game is already over!")
         if not self.valid_move(col):
